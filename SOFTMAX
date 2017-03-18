@@ -1,0 +1,98 @@
+
+#this is for test_softmax
+
+
+import tensorflow as tf
+tf.logging.set_verbosity(tf.logging.DEBUG)
+sess = tf.Session()
+#Importing data
+from tensorflow.examples.tutorials.mnist import input_data
+mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
+
+# previosus model
+new_saver = tf.train.import_meta_graph('d')
+new_saver.restore(sess, '')
+
+for v in tf.get_collection('variables'):
+    print(v.name)
+print(sess.run(tf.global_variables()))
+
+# wieghts and biases
+W = tf.get_collection('variables')[0]
+b = tf.get_collection('variables')[1]
+
+# test Imagaes labels
+x = tf.placeholder(tf.float32,[None, 700 ame='x')
+y_ = tf.placeholder(tf.float32, [None, 10],name='y_')
+
+# prediction function
+y = tf.nn.softmax(tf.matmul(x, W) + b,name='y')
+
+correct_prediction = tf.equal(tf.argmax(y,1), tf.argmax(y_,1))
+
+# ACCURACY
+accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+
+accu=sess.run(accuracy, feed_dict={x: mnist.test.images, y_: mnist.test.labels})
+print(accu)
+
+
+
+#for train_softmax
+
+
+import tensorflow as tf
+from tensorflow.contrib.session_bundle import exporter
+
+# Import MNIST data
+from tensorflow.examples.tutorials.mnist import input_data
+mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
+
+
+sess = tf.Session()
+tf.logging.set_verbosity(tf.logging.INFO)
+
+x = tf.placeholder(tf.float32, [None, 700],name='x')
+W = tf.Variable(tf.zeros([700, 10]),name='W')
+b = tf.Variable(tf.zeros([10]),name='b')
+
+y = tf.nn.softmax(tf.matmul(x, W) + b,name='y')
+y_ = tf.placeholder(tf.float32, [None, 10],name='y_')
+tf.add_to_collection('variables',W)
+tf.add_to_collection('variables',b)
+
+ cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=y, labels=y_))
+
+train_step = tf.train.GradientDescentOptimizer(0.5).minimize(cross_entropy)
+#Visualization
+tf.summary.histogram('weights', W)
+tf.summary.histogram('max_weight', tf.reduce_max(W))
+tf.summary.histogram('bias', b)
+tf.summary.scalar('cross_entropy', cross_entropy)
+tf.summary.histogram('cross_hist', cross_entropy)
+
+merged=tf.summary.merge_all()
+
+trainwriter=tf.summary.FileWriter('data/mnist_model'+'/logs/train',sess.graph)
+
+init = tf.global_variables_initializer()
+sess.run(init)
+
+for i in range(1000):
+    batch_xs, batch_ys = mnist.train.next_batch(100)
+    summary, _ = sess.run([merged, train_step], feed_dict={x: batch_xs, y_: batch_ys})
+    trainwriter.add_summary(summary, i)
+
+export_path = 'data/mnist_model'
+print('Exporting trained model to', export_path)
+
+#
+saver = tf.train.Saver(sharded=True)
+model_exporter = exporter.Exporter(saver)
+model_exporter.init(
+    sess.graph.as_graph_def(),
+    named_graph_signatures={
+        'inputs': exporter.generic_signature({'images': x}),
+        'outputs': exporter.generic_signature({'scores': y})})
+
+model_exporter.export(export_path, tf.constant(1), sess)
